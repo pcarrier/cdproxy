@@ -5,8 +5,10 @@ import (
 	"io"
 	"log"
 	"os"
+	"strconv"
 
 	ws "github.com/gorilla/websocket"
+	"github.com/valyala/fastjson"
 )
 
 var (
@@ -14,15 +16,47 @@ var (
 	out = bufio.NewWriter(os.NewFile(uintptr(4), "<out>"))
 )
 
+func readDebugLevel() int {
+	debugStr := os.Getenv("DEBUG")
+	if debugStr == "" {
+		return 0
+	}
+	debugLevel, err := strconv.Atoi(debugStr)
+	if err != nil {
+		return 0
+	}
+	return debugLevel
+}
+
+func debug(level int, dest, dir string, msg []byte) {
+	switch level {
+	case 0:
+		return
+	case 1:
+		json, err := fastjson.ParseBytes(msg)
+		if err != nil {
+			log.Fatalf("json parse: %v", err)
+		}
+		sessionId := json.GetStringBytes("sessionId")
+		id := json.GetInt("id")
+		method := json.GetStringBytes("method")
+		errors := len(json.GetArray("errors"))
+		log.Printf("%s %s %s %d %s %d", dest, dir, sessionId, id, method, errors)
+	default:
+		log.Printf("%s %s %s", dest, dir, string(msg))
+	}
+}
+
 func main() {
 	dest := os.Getenv("URL")
+	debugLevel := readDebugLevel()
+
 	conn, _, err := ws.DefaultDialer.Dial(dest, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
 	go func() {
 		for {
-			// Read chunks in until running into \0 then send everything to the websocket
 			var buffer []byte
 			for {
 				chunk, err := in.ReadBytes(0)
@@ -34,18 +68,21 @@ func main() {
 					break
 				}
 			}
-			err = conn.WriteMessage(ws.TextMessage, buffer[:len(buffer)-1])
+			msg := buffer[:len(buffer)-1]
+			debug(debugLevel, dest, ">", msg)
+			err = conn.WriteMessage(ws.TextMessage, msg)
 			if err != nil {
 				log.Fatalf("socket write: %v", err)
 			}
 		}
 	}()
 	for {
-		_, bytes, err := conn.ReadMessage()
+		_, msg, err := conn.ReadMessage()
 		if err != nil {
 			log.Fatalf("socket read: %v", err)
 		}
-		_, err = out.Write(bytes)
+		debug(debugLevel, dest, "<", msg)
+		_, err = out.Write(msg)
 		if err != nil {
 			log.Fatalf("fd write: %v", err)
 		}
