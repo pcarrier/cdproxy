@@ -28,7 +28,7 @@ func readDebugLevel() int {
 	return debugLevel
 }
 
-func debug(level int, dest, dir string, msg []byte) {
+func debug(level int, dir string, msg []byte) {
 	switch level {
 	case 0:
 		return
@@ -40,10 +40,10 @@ func debug(level int, dest, dir string, msg []byte) {
 		sessionId := json.GetStringBytes("sessionId")
 		id := json.GetInt("id")
 		method := json.GetStringBytes("method")
-		errors := len(json.GetArray("errors"))
-		log.Printf("%s %s %s %d %s %d", dest, dir, sessionId, id, method, errors)
+		errorCode := json.GetInt("error", "code")
+		log.Printf("%s %s %d %s %d", dir, sessionId, id, method, errorCode)
 	default:
-		log.Printf("%s %s %s", dest, dir, string(msg))
+		log.Printf("%s %s", dir, string(msg))
 	}
 }
 
@@ -69,7 +69,7 @@ func main() {
 				}
 			}
 			msg := buffer[:len(buffer)-1]
-			debug(debugLevel, dest, ">", msg)
+			debug(debugLevel, ">", msg)
 			err = conn.WriteMessage(ws.TextMessage, msg)
 			if err != nil {
 				log.Fatalf("socket write: %v", err)
@@ -81,7 +81,7 @@ func main() {
 		if err != nil {
 			log.Fatalf("socket read: %v", err)
 		}
-		debug(debugLevel, dest, "<", msg)
+		debug(debugLevel, "<", msg)
 		_, err = out.Write(msg)
 		if err != nil {
 			log.Fatalf("fd write: %v", err)
