@@ -37,11 +37,15 @@ func debug(level int, dir string, msg []byte) {
 		if err != nil {
 			log.Fatalf("json parse: %v", err)
 		}
-		sessionId := json.GetStringBytes("sessionId")
-		id := json.GetInt("id")
 		method := json.GetStringBytes("method")
-		errorCode := json.GetInt("error", "code")
-		log.Printf("%s %s %d %s %d", dir, sessionId, id, method, errorCode)
+		if string(method) == "Undetect.Error" {
+			log.Printf("%s [%s] %s", dir, method, json.GetStringBytes("params", "error"))
+		} else {
+			errorCode := json.GetInt("error", "code")
+			sessionId := json.GetStringBytes("sessionId")
+			id := json.GetInt("id")
+			log.Printf("%s %s %d %s %d", dir, sessionId, id, method, errorCode)
+		}
 	default:
 		log.Printf("%s %s", dir, string(msg))
 	}
